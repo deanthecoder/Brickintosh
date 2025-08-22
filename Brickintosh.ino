@@ -12,7 +12,7 @@ Arduino_ESP32SPI bus(LCD_DC, LCD_CS, LCD_SCK, LCD_MOSI);
 Arduino_ST7789 gfx(
     &bus,
     LCD_RST,
-    1,            // rotation (90 degrees)
+    0,            // rotation (90 degrees)
     true,         // IPS
     LCD_WIDTH,
     LCD_HEIGHT,
@@ -73,31 +73,31 @@ static inline void writeImageTiled(const uint8_t* img, int w, int h)
   }
 }
 
-// Stretch an RGB565 image horizontally to a target width by duplicating
-// the first source column to the left, and drawing the original image on the right.
+// Stretch an RGB565 image vertically to a target width by duplicating
+// the first source row downwards, and drawing the original image on the bottom.
 // Assumes caller wraps with startWrite()/endWrite().
 // img: pointer to w*h pixels, RGB565 packed in a uint8_t buffer
 // w,h: source image dimensions
 // x,y: top-left of the stretched bar area on screen
-// targetW: total width of the stretched area in pixels
-static inline void writeImageStretched(const uint8_t* img, int w, int h, int x, int y, int targetW)
+// targetH: total height of the stretched area in pixels
+static inline void writeImageStretched(const uint8_t* img, int w, int h, int x, int y, int targetH)
 {
-  const int leftFillW = (targetW > w) ? (targetW - w) : 0;
+  const int fillH = (targetH > h) ? (targetH - h) : 0;
 
-  // 1) Fill the left area using the first column of the image
-  if (leftFillW > 0)
+  // 1) Fill the top area using the first row of the image
+  if (fillH > 0)
   {
-    for (int row = 0; row < h; ++row)
+    for (int col = 0; col < w; ++col)
     {
-      // First pixel of row (2 bytes per pixel)
-      uint16_t col = *(uint16_t*)(img + row * w * 2);
-      gfx.writeFastHLine(x, y + row, leftFillW, col);
+      // First pixel of col (2 bytes per pixel)
+      uint16_t p = *(uint16_t*)(img + col * 2);
+      gfx.writeFastVLine(x + col, y, fillH, p);
     }
   }
 
-  // 2) Draw the original image so its RHS aligns with x + targetW - 1
+  // 2) Draw the original image so its top aligns with y + fillH
   //    i.e. its left starts at x + leftFillW
-  gfx.writeAddrWindow(x + leftFillW, y, w, h);
+  gfx.writeAddrWindow(x, y + fillH, w, h);
   gfx.writePixels((uint16_t*)img, w * h);
 }
 
@@ -107,6 +107,7 @@ static inline void writeImageStretched(const uint8_t* img, int w, int h, int x, 
 // w,h: source image dimensions
 // x,y: top-left target position on screen
 // width: number of columns from the source image to draw (<= w)
+/*
 static inline void writeImageClipped(const uint8_t* img, int w, int h, int x, int y, int width)
 {
   if (width > w) width = w;
@@ -118,6 +119,7 @@ static inline void writeImageClipped(const uint8_t* img, int w, int h, int x, in
     gfx.writePixels((uint16_t*)srcLine, width);
   }
 }
+*/
 
 /*****************************************************************************/
 
@@ -147,15 +149,15 @@ static void runSpeccyBoot() {
   delay(1000);
 
   // Black flash.
-  const int w = 256;
-  const int h = 192;
+  const int w = 192;
+  const int h = 256;
   const int x = (gfx.width() - w) / 2;
   const int y = (gfx.height() - h) / 2;
   gfx.fillRect(x, y, w, h, BLACK);
   delay(800);
 
   // Shrinking red bars.
-  const float durationMs = 250.0f;
+  const float durationMs = 800.0f;
   const long startTime = millis();
   float p;
   while ((p = (millis() - startTime) / durationMs) <= 1.0f) {
@@ -165,14 +167,12 @@ static void runSpeccyBoot() {
       p = 2.0f - p;
 
     gfx.startWrite();
-    for (int i = 8; i < 256; i += 8) {
-      int l = int(p * (h - 8));
-
-      // Clear lines.
-      gfx.writeFastVLine(x + i, y, h, BLACK);
+    for (int i = 8; i < h; i += 8) {
+      int l = int(p * (w - 8));
 
       // Draw red.
-      gfx.writeFastVLine(x + i, y + h - 4 - l, l, gfx.color565(0xCF, 0x01, 0x00));
+      gfx.writeFastHLine(x + 4, y + i, l, gfx.color565(0xCF, 0x01, 0x00));
+      gfx.writeFastHLine(x + 4 + l, y + i, w - 8 - l, BLACK);
     }
     gfx.endWrite();
   }
@@ -180,7 +180,8 @@ static void runSpeccyBoot() {
 
   // 1982 Sinclair Research...
   gfx.fillScreen(gfx.color565(0xCF, 0xCF, 0xCF));
-  gfx.draw16bitRGBBitmap(x, y + h - SinclairLtd_h, (uint16_t*)SinclairLtd_map, SinclairLtd_w, SinclairLtd_h);
+  gfx.draw16bitRGBBitmap(x, y, (uint16_t*)SinclairLtd_map, SinclairLtd_w, SinclairLtd_h);
+
   delay(2000);
 }
 
@@ -198,7 +199,7 @@ static void runMacBoot() {
   while ((p = (millis() - startTime) / durationMs) <= 1.0f) {
     int w = 7 + int(59 * p);
     gfx.startWrite();
-    writeImageStretched(MacProgress_map, MacProgress_w, MacProgress_h, (gfx.width() - MacLogo_w) / 2 + 65, (gfx.height() - MacLogo_h) / 2 + 131, w);
+    writeImageStretched(MacProgress_map, MacProgress_w, MacProgress_h, (gfx.width() - MacLogo_w) / 2 + 9, (gfx.height() - MacLogo_h) / 2 + 65, w);
     gfx.endWrite();
   }
 
