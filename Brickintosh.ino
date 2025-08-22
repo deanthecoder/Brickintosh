@@ -101,25 +101,19 @@ static inline void writeImageStretched(const uint8_t* img, int w, int h, int x, 
   gfx.writePixels((uint16_t*)img, w * h);
 }
 
-// Draw up to `width` pixels from each row of the source image.
+// Draw up to `height` pixels of the source image.
 // Assumes caller wraps with startWrite()/endWrite().
 // img: pointer to w*h pixels, RGB565 packed in a uint8_t buffer
 // w,h: source image dimensions
 // x,y: top-left target position on screen
-// width: number of columns from the source image to draw (<= w)
-/*
-static inline void writeImageClipped(const uint8_t* img, int w, int h, int x, int y, int width)
+// height: number of rows from the source image to draw (<= h)
+static inline void writeImageClipped(const uint8_t* img, int w, int h, int x, int y, int height)
 {
-  if (width > w) width = w;
+  if (height > h) height = h;
 
-  for (int row = 0; row < h; ++row)
-  {
-    const uint8_t* srcLine = img + row * (w * 2); // start of row
-    gfx.writeAddrWindow(x, y + row, width, 1);
-    gfx.writePixels((uint16_t*)srcLine, width);
-  }
+  gfx.writeAddrWindow(x, y, w, height);
+  gfx.writePixels((uint16_t*)img, w * height);
 }
-*/
 
 /*****************************************************************************/
 
@@ -145,7 +139,7 @@ void setup(void) {
 }
 
 static void runSpeccyBoot() {
-  gfx.fillScreen(gfx.color565(0xCF, 0xCF, 0xCF));
+  gfx.fillScreen(0xd69a);
   delay(1000);
 
   // Black flash.
@@ -179,10 +173,56 @@ static void runSpeccyBoot() {
   delay(800);
 
   // 1982 Sinclair Research...
-  gfx.fillScreen(gfx.color565(0xCF, 0xCF, 0xCF));
+  gfx.fillScreen(0xd69a);
   gfx.draw16bitRGBBitmap(x, y, (uint16_t*)SinclairLtd_map, SinclairLtd_w, SinclairLtd_h);
 
   delay(2000);
+}
+
+static void drawSpeccyCursor(int column, long startTime) {
+  const bool isOn = (((millis() - startTime) / 320) % 2) == 0;
+  const uint16_t* img = (uint16_t*)(isOn ? SpeccyL1_map : SpeccyL2_map);
+
+  const int w = 192;
+  const int h = 256;
+  const int x = (gfx.width() - w) / 2;
+  const int y = (gfx.height() - h) / 2;
+
+  gfx.draw16bitRGBBitmap(x, y + column * 8, img, SpeccyL1_w, SpeccyL1_h);
+}
+
+static void runSpeccyLoad() {
+  gfx.fillScreen(0xd69a);
+
+  const int w = 192;
+  const int h = 256;
+  const int x = (gfx.width() - w) / 2;
+  const int y = (gfx.height() - h) / 2;
+
+  // LOAD
+  gfx.startWrite();
+  writeImageClipped(SpeccyLoad_map, SpeccyLoad_w, SpeccyLoad_h, x, y, 8 * 4);
+  gfx.endWrite();
+
+  // Flashy cursor.
+  long t = millis(), start = t;
+  while (millis() - t < 1000)
+    drawSpeccyCursor(5, start);
+
+  // ..."macos"
+  for (int i = 1; i <= 7; i++) {
+    gfx.startWrite();
+    writeImageClipped(SpeccyLoad_map, SpeccyLoad_w, SpeccyLoad_h, x, y, 8 * (5 + i));
+    gfx.endWrite();
+
+    t = millis();
+    while (millis() - t < 400)
+      drawSpeccyCursor(5 + i, start);
+  }
+
+  t = millis();
+  while (millis() - t < 1500)
+    drawSpeccyCursor(5 + 7, start);
 }
 
 static void runMacBoot() {
@@ -211,5 +251,6 @@ void loop() {
   delay(500);
 
   runSpeccyBoot();
+  runSpeccyLoad();
   runMacBoot();
 }

@@ -2,8 +2,8 @@
 
 # 🧱 Brickintosh
 
-A tiny Lego Macintosh powered by an ESP32-S3 + 1.69" IPS display.  
-It boots like a Mac, boots as a ZX Spectrum, loads MacOS 8, and occasionally throws a BSOD just to keep you guessing.  
+A tiny Lego Macintosh powered by an ESP32-S3 + 1.69" LCD display.  
+It like a Mac, boots as a ZX Spectrum, loads MacOS 8, and occasionally throws a BSOD just to keep you guessing.  
 Because why settle for one retro system when you can mash them all together?
 
 ---
@@ -30,7 +30,7 @@ Because why settle for one retro system when you can mash them all together?
 
 ## 📦 Software
 
-- [TFT_eSPI](https://github.com/Bodmer/TFT_eSPI) / [LovyanGFX](https://github.com/lovyan03/LovyanGFX) for LCD driving.  
+- [TFT_eSPI](https://github.com/Bodmer/TFT_eSPI) for LCD driving.  
 - Arduino framework.  
 - RGB565-encoded visuals.  
 - Optional OTA update support for wireless flashing.  
