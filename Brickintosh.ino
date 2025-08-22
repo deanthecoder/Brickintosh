@@ -2,7 +2,6 @@
 #include "Arduino_GFX_Library.h"
 #include "pin_config.h"
 #include <Wire.h>
-#include "HWCDC.h"
 #include "Sprites.h"
 
 /*****************************************************************************/
@@ -141,25 +140,51 @@ void setup(void) {
   gfx.fillScreen(BLACK);
   pinMode(LCD_BL, OUTPUT);
   digitalWrite(LCD_BL, HIGH);
-
-/*
-  gfx.setTextColor(GREEN);
-  for (int x = 0; x < numRows; x++) {
-    gfx.setCursor(10 + x * 8, 2);
-    gfx.print(x, 16);
-  }
-
-  char c = 0;
-  for (int y = 0; y < numRows; y++) {
-    for (int x = 0; x < numCols; x++) {
-      gfx.drawChar(10 + x * 8, 12 + y * 10, c++, WHITE, BLACK);
-    }
-  }
-*/
-
 }
 
-static void runMacBootScreen() {
+static void runSpeccyBoot() {
+  gfx.fillScreen(gfx.color565(0xCF, 0xCF, 0xCF));
+  delay(1000);
+
+  // Black flash.
+  const int w = 256;
+  const int h = 192;
+  const int x = (gfx.width() - w) / 2;
+  const int y = (gfx.height() - h) / 2;
+  gfx.fillRect(x, y, w, h, BLACK);
+  delay(800);
+
+  // Shrinking red bars.
+  const float durationMs = 250.0f;
+  const long startTime = millis();
+  float p;
+  while ((p = (millis() - startTime) / durationMs) <= 1.0f) {
+    // Lines go from small to big to small again.
+    p *= 2.0f;
+    if (p > 1.0f)
+      p = 2.0f - p;
+
+    gfx.startWrite();
+    for (int i = 8; i < 256; i += 8) {
+      int l = int(p * (h - 8));
+
+      // Clear lines.
+      gfx.writeFastVLine(x + i, y, h, BLACK);
+
+      // Draw red.
+      gfx.writeFastVLine(x + i, y + h - 4 - l, l, gfx.color565(0xCF, 0x01, 0x00));
+    }
+    gfx.endWrite();
+  }
+  delay(800);
+
+  // 1982 Sinclair Research...
+  gfx.fillScreen(gfx.color565(0xCF, 0xCF, 0xCF));
+  gfx.draw16bitRGBBitmap(x, y + h - SinclairLtd_h, (uint16_t*)SinclairLtd_map, SinclairLtd_w, SinclairLtd_h);
+  delay(2000);
+}
+
+static void runMacBoot() {
   // Background and splash.
   gfx.startWrite();
   writeImageTiled(MacTile_map, MacTile_w, MacTile_h);
@@ -184,5 +209,6 @@ void loop() {
   gfx.fillScreen(BLACK);
   delay(500);
 
-  runMacBootScreen();
+  runSpeccyBoot();
+  runMacBoot();
 }
