@@ -124,9 +124,6 @@ void setup(void) {
   USBSerial.println("Brickintosh Demo by DeanTheCoder");
   USBSerial.println("https://github.com/deanthecoder/Brickintosh");
 
-  int numCols = LCD_WIDTH / 8;
-  int numRows = LCD_HEIGHT / 10;
-
   // Init Display
   if (!gfx.begin()) {
     USBSerial.println("gfx.begin() failed, halting.");
@@ -136,6 +133,7 @@ void setup(void) {
   gfx.fillScreen(BLACK);
   pinMode(LCD_BL, OUTPUT);
   digitalWrite(LCD_BL, HIGH);
+  delay(2000);
 }
 
 static void runSpeccyBoot() {
@@ -278,17 +276,64 @@ static void runSpeccyLoad() {
     delay(1000);
 
     // Cyan/red bars.
-    long t = millis();
+    t = millis();
     while (millis() - t < 3000)
       drawSpeccyLoadBars(0x0679, 0xc800, 6, 6, millis());
+
+    gfx.draw16bitRGBBitmap(x + w - 14, y + 1, (uint16_t*)SpeccyProgram_map, SpeccyProgram_w, SpeccyProgram_h);
   }
 
   // Screen load sequence.
-  {
-    long t = millis();
-    while (millis() - t < 6000) // todo - set correct time
-      drawSpeccyLoadBars(0xce63, 0x0019, 3, 2, random());
+  t = millis();
+  int rowsLoaded = 0;
+  while (rowsLoaded < w) {
+    // Yellow/Blue data bars.
+    drawSpeccyLoadBars(0xce63, 0x0019, 3, 2, random());
+
+    // B/W Screen load.
+    int newRowsLoaded = (millis() - t) / 100;
+    if (newRowsLoaded > rowsLoaded) {
+      rowsLoaded++;
+
+      int third = rowsLoaded / 64;
+      int row8 = (rowsLoaded % 8) * 8;
+      int rowOffset = (rowsLoaded / 8) % 8;
+
+      gfx.startWrite();
+      int xx = x + w - third * 64 - row8 - rowOffset;
+      int tileX = xx;
+      tileX %= MacTile_w;
+      for (int yy = y; yy < y + h; yy++) {
+        int tileY = yy % MacTile_h;
+        uint16_t rgb = ((uint16_t*)MacTile_map)[tileY * MacTile_w + tileX];
+        gfx.writePixel(xx, yy, (rgb & 0x1F) < 20 ? BLACK : 0xd69a);
+      }
+      gfx.endWrite();
+    }
   }
+
+  // Color fill-in (draw 8 columns at a time, right-to-left).
+  speccyBorder(0xd69a);
+  for (int i = 0; i < gfx.width(); i += 8) {
+    gfx.startWrite();
+
+    // Process a group of up to 8 columns.
+    for (int dx = 0; dx < 8 && (i + dx) < gfx.width(); ++dx) {
+      int x = gfx.width() - 1 - (i + dx);        // right-to-left screen x
+      int tileX = x % MacTile_w;                 // tile column for this x
+      for (int y = 0; y < gfx.height(); ++y) {
+        int tileY = y % MacTile_h;
+        uint16_t rgb = ((uint16_t*)MacTile_map)[tileY * MacTile_w + tileX];
+        gfx.writePixel(x, y, rgb);
+      }
+    }
+
+    gfx.endWrite();
+
+    delay(75);
+  }
+
+  delay(2000);
 }
 
 static void runMacBoot() {
@@ -310,14 +355,18 @@ static void runMacBoot() {
     gfx.endWrite();
   }
 
-  delay(1000);
+  delay(2000);
+
+  // Desktop.
+  gfx.startWrite();
+  writeImageTiled(MacTile_map, MacTile_w, MacTile_h);
+  gfx.endWrite();
 }
 
 void loop() {
-  gfx.fillScreen(BLACK);
-  delay(500);
-
   runSpeccyBoot();
   runSpeccyLoad();
   runMacBoot();
+
+  delay(3000);
 }
