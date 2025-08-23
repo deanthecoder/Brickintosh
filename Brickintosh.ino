@@ -151,7 +151,7 @@ static void runSpeccyBoot() {
   delay(800);
 
   // Shrinking red bars.
-  const float durationMs = 800.0f;
+  const float durationMs = 600.0f;
   const long startTime = millis();
   float p;
   while ((p = (millis() - startTime) / durationMs) <= 1.0f) {
@@ -179,6 +179,7 @@ static void runSpeccyBoot() {
   delay(2000);
 }
 
+// Draw the Speccy L cursor, flashing.
 static void drawSpeccyCursor(int column, long startTime) {
   const bool isOn = (((millis() - startTime) / 320) % 2) == 0;
   const uint16_t* img = (uint16_t*)(isOn ? SpeccyL1_map : SpeccyL2_map);
@@ -189,6 +190,49 @@ static void drawSpeccyCursor(int column, long startTime) {
   const int y = (gfx.height() - h) / 2;
 
   gfx.draw16bitRGBBitmap(x, y + column * 8, img, SpeccyL1_w, SpeccyL1_h);
+}
+
+// Set the Speccy border color.
+static void speccyBorder(uint16_t rgb) {
+  const int w = 192;
+  const int h = 256;
+  const int x = (gfx.width() - w) / 2;
+  const int y = (gfx.height() - h) / 2;
+
+  gfx.startWrite();
+  for (int i = 0; i < gfx.width(); i++) {
+    if (i < x || i > x + w) {
+      // Top/bottom full-width lines.
+      gfx.writeFastVLine(i, 0, gfx.height(), rgb);
+    } else {
+      // Middle section.
+      gfx.writeFastVLine(i, 0, y, rgb);
+      gfx.writeFastVLine(i, y + h, y, rgb);
+    }
+  }
+  gfx.endWrite();
+}
+
+static void drawSpeccyLoadBars(uint16_t rgb1, uint16_t rgb2, int w1, int w2, long timeMs) {
+    const int w = 192;
+    const int h = 256;
+    const int x = (gfx.width() - w) / 2;
+    const int y = (gfx.height() - h) / 2;
+
+    gfx.startWrite();
+    for (int i = 0; i < gfx.width(); i++) {
+      uint16_t rgb = (((i - timeMs / 10) & (w1 + w2)) >= w1) ? rgb1 : rgb2;
+
+      if (i < x || i > x + w) {
+        // Top/bottom full-width lines.
+        gfx.writeFastVLine(i, 0, gfx.height(), rgb);
+      } else {
+        // Middle section.
+        gfx.writeFastVLine(i, 0, y, rgb);
+        gfx.writeFastVLine(i, y + h, y, rgb);
+      }
+    }
+    gfx.endWrite();
 }
 
 static void runSpeccyLoad() {
@@ -223,6 +267,28 @@ static void runSpeccyLoad() {
   t = millis();
   while (millis() - t < 1500)
     drawSpeccyCursor(5 + 7, start);
+
+  // Program load sequence.
+  gfx.fillScreen(0xd69a);
+  for (int i = 0; i < 2; i++) {
+    // Cyan/red flashy.
+    speccyBorder(0x0679);
+    delay(1000);
+    speccyBorder(0xc800);
+    delay(1000);
+
+    // Cyan/red bars.
+    long t = millis();
+    while (millis() - t < 3000)
+      drawSpeccyLoadBars(0x0679, 0xc800, 6, 6, millis());
+  }
+
+  // Screen load sequence.
+  {
+    long t = millis();
+    while (millis() - t < 6000) // todo - set correct time
+      drawSpeccyLoadBars(0xce63, 0x0019, 3, 2, random());
+  }
 }
 
 static void runMacBoot() {
@@ -233,6 +299,7 @@ static void runMacBoot() {
   gfx.endWrite();
 
   // Progress bar.
+  delay(800);
   const float durationMs = 3000.0f;
   const long startTime = millis();
   float p;
