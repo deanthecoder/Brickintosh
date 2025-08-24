@@ -149,7 +149,7 @@ static void runSpeccyBoot() {
   delay(800);
 
   // Shrinking red bars.
-  const float durationMs = 600.0f;
+  const float durationMs = 500.0f;
   const long startTime = millis();
   float p;
   while ((p = (millis() - startTime) / durationMs) <= 1.0f) {
@@ -363,10 +363,41 @@ static void runMacBoot() {
   gfx.endWrite();
 }
 
+static void runMacMenu() {
+  // Slide-on menu.
+  for (int i = 0; i < MacMenu_w; i++) {
+    gfx.draw16bitRGBBitmap(gfx.width() - i, 0, (uint16_t*)MacMenu_map, MacMenu_w, MacMenu_h);  
+    delay(70);
+  }
+  delay(1000);
+
+  // Demo window.
+  long t = millis();
+  float p;
+  while ((p = (millis() - t) / 500.0f) < 1.0) {
+    p = int(p * 8) / 8.0f; // Discrete border sizes.
+    int dx = int(MacWindow_w / 2 * p);
+    int dy = int(MacWindow_h / 2 * p);
+    gfx.drawRect(gfx.width() / 2 - dx, gfx.height() / 2 - dy, dx * 2, dy * 2, 0x9d13);
+  }
+
+  gfx.startWrite();
+  writeImageCentered(MacWindow_map, MacWindow_w, MacWindow_h);
+  gfx.endWrite();
+}
+
 void loop() {
+  // Black flash and memory test, up to '1982 Sinclair Research Ltd'
   runSpeccyBoot();
+
+  // LOAD "macos" + screen load sequence.
   runSpeccyLoad();
+
+  // Mac OS 9 boot logo and progress bar.
   runMacBoot();
+
+  // Show OS 9 main menu and demo window  .
+  runMacMenu();
 
   delay(3000);
 }
