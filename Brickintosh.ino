@@ -405,7 +405,7 @@ static void runMacMenu() {
   // Demo window.
   long t = millis();
   float p;
-  while ((p = (millis() - t) / 500.0f) < 1.0) {
+  while ((p = (millis() - t) / 500.0f) < 1.0f) {
     p = int(p * 8) / 8.0f; // Discrete border sizes.
     int dx = int(MacWindow_w / 2 * p);
     int dy = int(MacWindow_h / 2 * p);
@@ -436,24 +436,24 @@ static void runTunnel() {
   // Draw the tunnel.
   long t = millis();
   int o = 0;
-  while (millis() - t < 8000) {
+  float ringStart = 0.0f;
+  while (true) {
     speccy.startFrame();
     speccy.clear(BLACK);
 
-    for (int i = 0; i < RINGS; i++) {
+    for (int i = ringStart; i < RINGS; i++) {
       int bright = 16 * sinf((i + o * 0.6f) * 1.5f);
       if (bright <= 0)
         continue; // Hidden.
 
       // Smaller rings = darker.
-      float f = 1.0f - float(i) / RINGS;
-      f *= 2.0;
+      float f = (1.0f - float(i) / RINGS) * 2.0f;
       if (f > 1.5f) f = 1.5f;
       uint16_t c = scaleRgb565(RED, f);
 
       // Draw rings.
-      int dx = 48 * cosf((o + i) * 0.03);
-      int dy = 32 * cosf((o + i) * 0.07);
+      int dx = 48 * cosf((o + i) * 0.03f);
+      int dy = 32 * cosf((o + i) * 0.07f);
 
       for (int j = 0; j < POINTS; j++) {
         int x = 128 + xy[i][j][0] + dx;
@@ -466,6 +466,14 @@ static void runTunnel() {
     speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
 
     o++;
+
+    // Finished?
+    if (millis() - t > 8000)
+    {
+      ringStart += 0.2f;
+      if (ringStart > RINGS)
+        break;  // We're done.
+    }
   }
 }
 
@@ -477,9 +485,9 @@ void loop() {
   // Mac OS 9 boot logo and progress bar.
 
   // Show OS 9 main menu and demo window.
-  runMacMenu();
 
   // Tunnel.
+  gfx.fillScreen(WHITE);
   runTunnel();
 
   delay(3000);
