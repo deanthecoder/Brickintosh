@@ -27,6 +27,7 @@ static SpeccyFB speccy;
 
 /*****************************************************************************/
 
+// Set the brightness of a single RGB565 color.
 static uint16_t scaleRgb565(uint16_t c, float f) {
   int r = (c >> 11) & 0x1F;
   int g = (c >> 5)  & 0x3F;
@@ -477,18 +478,52 @@ static void runTunnel() {
   }
 }
 
+static void runQR() {
+  float p;
+
+  // Scale to max.
+  long t = millis();
+  while ((p = (millis() - t) / 3000.0) <= 1.0) {
+    float s = p * p * (3.0f - 2.0f * p);   // smoothstep(0,1,p)
+    speccy.startFrame();
+    speccy.writeImageScaled((uint16_t*)QR_map, QR_w, QR_h, 256 / 2, 192 / 2, s);
+    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+  }
+
+  delay(4000);
+
+  // Scale to min.
+  t = millis();
+  while ((p = (millis() - t) / 500.0) <= 1.0) {
+    speccy.startFrame();
+    speccy.clear(BLACK);
+    speccy.writeImageScaled((uint16_t*)QR_map, QR_w, QR_h, 256 / 2, 192 / 2, 1.0f - p);
+    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+  }
+
+  speccy.startFrame();
+  speccy.clear(BLACK);
+  speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+}
+
 void loop() {
   // Black flash and memory test, up to '1982 Sinclair Research Ltd'
+  runSpeccyBoot();
 
   // LOAD "macos" + screen load sequence.
+  runSpeccyLoad();
 
   // Mac OS 9 boot logo and progress bar.
+  runMacBoot();
 
   // Show OS 9 main menu and demo window.
+  runMacMenu();
 
   // Tunnel.
-  gfx.fillScreen(WHITE);
   runTunnel();
+
+  // QR code.
+  runQR();
 
   delay(3000);
 }

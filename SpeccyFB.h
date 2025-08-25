@@ -49,6 +49,33 @@ public:
         }
     }
 
+    // Draw an RGB565 image scaled and centered at (cx, cy) in logical 256x192 space.
+    // scale: 0..1.0  (0 => nothing, 1 => full size)
+    void writeImageScaled(const uint16_t* img, int srcW, int srcH, int cx, int cy, float scale) {
+        // Destination size (rounded)
+        const int dstW = int(srcW * scale + 0.5f);
+        const int dstH = int(srcH * scale + 0.5f);
+
+        // Top-left so the image is centered at (cx, cy)
+        const int x0 = cx - (dstW >> 1);
+        const int y0 = cy - (dstH >> 1);
+
+        // Nearest-neighbour sampling with integer math (rounded)
+        // sx = round(dx * srcW / dstW), sy = round(dy * srcH / dstH)
+        for (int dy = 0; dy < dstH; ++dy) {
+            const int sy = (dy * srcH + (dstH >> 1)) / dstH;
+            const int y  = y0 + dy;
+            const uint16_t* srcRow = img + sy * srcW;
+
+            for (int dx = 0; dx < dstW; ++dx) {
+                const int sx = (dx * srcW + (dstW >> 1)) / dstW;
+                const int x  = x0 + dx;
+                plot(x, y, srcRow[sx]);
+            }
+        }
+    }
+    
+    /*
     void hline(int x, int y, int w, uint16_t col) {
         if ((unsigned)y >= 192 || w <= 0) return;
         if (x < 0) { w += x; x = 0; }
@@ -103,6 +130,7 @@ public:
             if (c1 > _right[rx]) _right[rx] = c1;
         }
     }
+    */
 
     // Push only changed spans per dirty row. Assumes in-bounds blit.
     void endFrame(Arduino_ST7789& tft, int dstX, int dstY) {
