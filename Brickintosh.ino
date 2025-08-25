@@ -4,12 +4,14 @@
 #include <Wire.h>
 #include "Sprites.h"
 
+#include "SpeccyFB.h"
+
 /*****************************************************************************/
 
 constexpr int16_t LCD_X_OFFSET = 0;    // Panel-specific vertical offset.
 constexpr int16_t LCD_Y_OFFSET = 20;   // Panel-specific vertical offset.
-Arduino_ESP32SPI bus(LCD_DC, LCD_CS, LCD_SCK, LCD_MOSI);
-Arduino_ST7789 gfx(
+static Arduino_ESP32SPI bus(LCD_DC, LCD_CS, LCD_SCK, LCD_MOSI);
+static Arduino_ST7789 gfx(
     &bus,
     LCD_RST,
     0,            // rotation (90 degrees)
@@ -21,7 +23,29 @@ Arduino_ST7789 gfx(
     0, 0
 );
 
+static SpeccyFB speccy;
+
 /*****************************************************************************/
+
+static uint16_t scaleRgb565(uint16_t c, float f) {
+  int r = (c >> 11) & 0x1F;
+  int g = (c >> 5)  & 0x3F;
+  int b =  c        & 0x1F;
+
+  // When f=1 → original color, when f=2 → full white.
+  float t = (f <= 1.0f) ? f : 1.0f;      // scaling part
+  float w = (f > 1.0f) ? (f - 1.0f) : 0; // whitening part, 0..1
+
+  r = int(r * t + (0x1F - r) * w + 0.5f);
+  g = int(g * t + (0x3F - g) * w + 0.5f);
+  b = int(b * t + (0x1F - b) * w + 0.5f);
+
+  if (r > 0x1F) r = 0x1F;
+  if (g > 0x3F) g = 0x3F;
+  if (b > 0x1F) b = 0x1F;
+
+  return (r << 11) | (g << 5) | b;
+}
 
 // Draw an RGB565 image centered on the screen (write* version).
 // Assumes caller wraps with startWrite()/endWrite().
@@ -117,7 +141,7 @@ static inline void writeImageClipped(const uint8_t* img, int w, int h, int x, in
 
 /*****************************************************************************/
 
-HWCDC USBSerial;
+static HWCDC USBSerial;
 
 void setup(void) {
   USBSerial.begin(115200);
@@ -126,9 +150,16 @@ void setup(void) {
 
   // Init Display
   if (!gfx.begin()) {
-    USBSerial.println("gfx.begin() failed, halting.");
+    USBSerial.println("gfx.begin() failed. Halting.");
     while (1);
   }
+
+  // Init the Spectrum frame buffer.
+  if (!speccy.init()) {
+    USBSerial.println("speccy.init() failed. Halting.");
+    while (1);
+  }
+
 
   gfx.fillScreen(BLACK);
   pinMode(LCD_BL, OUTPUT);
@@ -386,18 +417,70 @@ static void runMacMenu() {
   gfx.endWrite();
 }
 
+static void runTunnel() {
+  #define RINGS 32
+  #define POINTS 24
+  int16_t xy[RINGS][POINTS][2];
+
+  // Calc the rings.
+  for (int i = 0; i < RINGS; i++) {
+    float z = i * ((128.0f * 80.0f / 20.0f) - 80.0f) / (RINGS - 1);
+    float scale = 80.0f / (80.0f + z); // scale = focal / (focal + z)
+    for (int j = 0; j < POINTS; j++) {
+      float theta = (j * TWO_PI) / POINTS;
+      xy[i][j][0] = sinf(theta) * 140.0f * scale;
+      xy[i][j][1] = cosf(theta) * 140.0f * scale;
+    }
+  }
+
+  // Draw the tunnel.
+  long t = millis();
+  int o = 0;
+  while (millis() - t < 8000) {
+    speccy.startFrame();
+    speccy.clear(BLACK);
+
+    for (int i = 0; i < RINGS; i++) {
+      int bright = 16 * sinf((i + o * 0.6f) * 1.5f);
+      if (bright <= 0)
+        continue; // Hidden.
+
+      // Smaller rings = darker.
+      float f = 1.0f - float(i) / RINGS;
+      f *= 2.0;
+      if (f > 1.5f) f = 1.5f;
+      uint16_t c = scaleRgb565(RED, f);
+
+      // Draw rings.
+      int dx = 48 * cosf((o + i) * 0.03);
+      int dy = 32 * cosf((o + i) * 0.07);
+
+      for (int j = 0; j < POINTS; j++) {
+        int x = 128 + xy[i][j][0] + dx;
+        int y = 96 + xy[i][j][1] + dy;
+
+        speccy.plot(x, y, c);
+      }
+    }
+
+    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+
+    o++;
+  }
+}
+
 void loop() {
   // Black flash and memory test, up to '1982 Sinclair Research Ltd'
-  runSpeccyBoot();
 
   // LOAD "macos" + screen load sequence.
-  runSpeccyLoad();
 
   // Mac OS 9 boot logo and progress bar.
-  runMacBoot();
 
-  // Show OS 9 main menu and demo window  .
+  // Show OS 9 main menu and demo window.
   runMacMenu();
+
+  // Tunnel.
+  runTunnel();
 
   delay(3000);
 }
