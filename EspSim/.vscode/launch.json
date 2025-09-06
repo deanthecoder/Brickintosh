@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run SDL Sim",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/sim",
+      "cwd": "${workspaceFolder}",
+      "MIMode": "lldb",
+      "stopAtEntry": false,
+      "args": []
+    }
+  ]
+}

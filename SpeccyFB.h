@@ -1,6 +1,8 @@
 #pragma once
 
+#ifndef SIM_MODE
 #include "esp_heap_caps.h"
+#endif
 
 class SpeccyFB {
 public:

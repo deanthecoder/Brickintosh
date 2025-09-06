@@ -1,0 +1,27 @@
+// .vscode/tasks.json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build SDL Sim",
+      "type": "shell",
+      "command": "clang++",
+      "args": [
+        "-std=c++20",
+        "-g", "-O0", "-fno-omit-frame-pointer",
+        "main.cpp",
+        "-I.", "-I..",
+        // If your code does: #include <SDL.h>
+        "-I/opt/homebrew/include/SDL2",
+        // If instead you do: #include <SDL2/SDL.h>, you can use:
+        // "-I/opt/homebrew/include",
+        "-D_THREAD_SAFE",
+        "-DSDL_MAIN_HANDLED",
+        "-L/opt/homebrew/lib", "-lSDL2",
+        "-o", "sim"
+      ],
+      "group": "build",
+      "problemMatcher": ["$gcc"]
+    }
+  ]
+}

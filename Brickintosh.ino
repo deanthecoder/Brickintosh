@@ -1,9 +1,11 @@
+#ifndef SIM_MODE
 #include <Arduino.h>
 #include "Arduino_GFX_Library.h"
 #include "pin_config.h"
 #include <Wire.h>
-#include "Sprites.h"
+#endif
 
+#include "Sprites.h"
 #include "SpeccyFB.h"
 
 /*****************************************************************************/
