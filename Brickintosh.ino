@@ -616,6 +616,73 @@ static void runQrToWave() {
   }
 }
 
+static void runFire() {
+  constexpr int W = 128;                  // logical fire columns
+  constexpr int H = 96;                  // limit height for speed
+  constexpr int TOP_Y = 192 - H;        // top of fire region on speccy
+
+  static uint8_t buf[H][W];             // intensity 0..255
+  uint16_t pal[256];             // RGB565 palette
+
+  for (int i = 0; i < 256; ++i) {
+    int r = 0, g = 0, b = 0;
+    if (i < 64) {                     // black -> red
+      r = i << 2;
+    } else if (i < 128) {             // red -> orange
+      r = 255; g = (i - 64) << 2;
+    } else if (i < 192) {             // orange -> yellow
+      r = 255; g = 255;
+    } else {                          // yellow -> white
+      r = 255; g = 255; b = (i - 192) << 2; if (b > 255) b = 255;
+    }
+    pal[i] = (uint16_t)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+  }
+
+  // Clear buffer
+  memset(buf, 0, sizeof(buf));
+
+  const long t0 = millis();
+  while (millis() - t0 < 8000) {
+    long frameStart = millis();
+
+    // Seed bottom row with noise
+    for (int x = 0; x < W; ++x) {
+      uint8_t f = ((uint8_t)random());
+      buf[H - 1][x] = f;
+    }
+
+    // Propagate upwards (compute from bottom-2 up to top)
+    for (int y = 0; y < H - 1; y++) {
+      const uint8_t* nextRow = buf[y + 1];
+      const uint8_t* nextNextRow = (y + 2 < H) ? buf[y + 2] : nextRow;
+      uint8_t* row = buf[y];
+      row[0] = 0;  // edges cool fast
+      for (int x = 1; x < W - 1; ++x) {
+        int sum = nextRow[x - 1] + nextRow[x] + nextRow[x + 1] + nextNextRow[x];
+        row[x] = (uint8_t)(sum * 32 / 132);
+      }
+      row[W - 1] = 0;
+    }
+
+    // Draw to speccy framebuffer (each logical column spans 4 pixels)
+    speccy.startFrame();
+    for (int y = 0; y < H - 1; ++y) {
+      int sy = y * 2;
+      for (int x = 0; x < W; ++x) {
+        uint16_t c = pal[buf[y][x]];
+        speccy.fillRect(x * 2, sy, 2, 2, c);
+      }
+    }
+
+    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+
+    // Limit FPS
+    long dt = millis() - frameStart;
+    const long frameMs = 1000 / 20;
+    if (dt < frameMs) delay(frameMs - dt);
+  }
+}
+
 void loop() {
   // Black flash and memory test, up to '1982 Sinclair Research Ltd'
   runSpeccyBoot();
@@ -635,6 +702,9 @@ void loop() {
   // QR code.
   runQR();
   runQrToWave();
+
+  // Fire.
+  runFire();
 
   delay(3000);
 }
