@@ -19,6 +19,7 @@ extern "C" void sdlLoop();
 #define TWO_PI 6.28318530718
 
 #define BLACK 0
+#define WHITE 0xFFFF
 #define RED 0xF800
 
 #define pinMode(a, b)

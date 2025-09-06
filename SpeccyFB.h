@@ -111,6 +111,7 @@ public:
         if (c0 < _left[row])  _left[row]  = c0;
         if (c1 > _right[row]) _right[row] = c1;
     }
+    */
 
     // Draw a filled rect in logical space (handy + updates spans correctly).
     void fillRect(int x, int y, int w, int h, uint16_t col) {
@@ -132,7 +133,6 @@ public:
             if (c1 > _right[rx]) _right[rx] = c1;
         }
     }
-    */
 
     // Push only changed spans per dirty row. Assumes in-bounds blit.
     void endFrame(Arduino_ST7789& tft, int dstX, int dstY) {

@@ -493,19 +493,127 @@ static void runQR() {
   }
 
   delay(4000);
+}
 
-  // Scale to min.
-  t = millis();
-  while ((p = (millis() - t) / 500.0) <= 1.0) {
-    speccy.startFrame();
-    speccy.clear(BLACK);
-    speccy.writeImageScaled((uint16_t*)QR_map, QR_w, QR_h, 256 / 2, 192 / 2, 1.0f - p);
-    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+static void runQrToWave() {
+  // QR code → wave particle animation.
+  // 16x16 particles sample the QR image, morph to a cosine wave,
+  // flatten to a line, then fly off-screen left/right.
+
+  // Particle grid params.
+  constexpr int PG = 16;               // particles per axis (PG x PG)
+  constexpr int PN = PG * PG;          // total particles
+
+  // Speccy framebuffer center.
+  const int cx = 256 / 2;
+  const int cy = 192 / 2;
+
+  // Precompute particles from QR image, centered on speccy buffer.
+  struct Particle {
+    int16_t sx, sy;     // start (QR) position in speccy coords
+    uint16_t color;     // particle color
+    int8_t dir;         // -1 = left, +1 = right for fly-away
+    bool active;        // skip if false (e.g., black QR cell)
+    uint8_t gx, gy;     // grid coordinates for wave param
+  };
+  static Particle P[PN];  // avoid large stack usage
+
+  int idx = 0;
+  for (int gy = 0; gy < PG; ++gy) {
+    // Sample y in QR image (center of each cell)
+    int syImg = (QR_h * (2 * gy + 1)) / (2 * PG);
+    for (int gx = 0; gx < PG; ++gx, ++idx) {
+      int sxImg = (QR_w * (2 * gx + 1)) / (2 * PG);
+      uint16_t c = ((uint16_t*)QR_map)[syImg * QR_w + sxImg];
+
+      // Initialize particle
+      Particle &pp = P[idx];
+      pp.gx = (uint8_t)gx;
+      pp.gy = (uint8_t)gy;
+      pp.color = c;
+      pp.active = (c != BLACK);     // skip black samples for speed/clarity
+      pp.dir = (gx < PG / 2) ? -1 : +1;
+
+      // Map QR image coordinates into speccy space, centered.
+      pp.sx = cx - (QR_w / 2) + sxImg;
+      pp.sy = cy - (QR_h / 2) + syImg;
+    }
   }
 
-  speccy.startFrame();
-  speccy.clear(BLACK);
-  speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+  // Animation timing (ms)
+  const long t0 = millis();
+  const float morphDur = 3400.0f;   // QR → wave morph
+  const float waveDur  = 4000.0f;   // oscillate while flattening
+  const float flyDur   = 1200.0f;   // fly off-screen
+  const float totalDur = morphDur + waveDur + flyDur;
+
+  // Wave params
+  const float baseAmp  = 56.0f;     // initial amplitude in pixels
+  const float phaseHz  = 0.7f;      // wave phase speed (cycles/sec)
+
+  // Precompute per-column x→theta, x→tx and per-row multipliers
+  float thetaLut[PG];
+  int   txLut[PG];
+  float rowMul[PG];
+  for (int x = 0; x < PG; ++x) {
+    float u = (PG == 1) ? 0.0f : (float)x / (float)(PG - 1);
+    thetaLut[x] = u * TWO_PI;
+    txLut[x] = (int)(u * 255.0f + 0.5f);
+  }
+  for (int y = 0; y < PG; ++y) rowMul[y] = 1.0f + 0.18f * (float)y;
+
+  // Particle visual size.
+  const int halfWH = 4;
+
+  // Render frames until animation completes.
+  long now;
+  while ((now = millis()) - t0 < (long)totalDur + 60) {
+    float t = (float)(now - t0);
+
+    // Stage progress
+    float morphP = t < morphDur ? (t / morphDur) : 1.0f;               // 0..1
+    float waveP  = (t <= morphDur) ? 0.0f : ((t - morphDur) / waveDur);
+    if (waveP > 1.0f) waveP = 1.0f;
+    float flyP   = (t <= morphDur + waveDur) ? 0.0f : ((t - morphDur - waveDur) / flyDur);
+    if (flyP > 1.0f) flyP = 1.0f;
+
+    float mp = morphP * morphP * (3.0f - 2.0f * morphP);
+    float phase = TWO_PI * phaseHz * (t / 1000.0f);
+
+    float amp = baseAmp * (1.0f - waveP);
+
+    speccy.startFrame();
+    speccy.clear(BLACK);
+
+    // Draw particles
+    for (int i = 0; i < PN; ++i) {
+      const Particle &pp = P[i];
+      if (!pp.active) continue;
+
+      const int tx = txLut[pp.gx];
+      const float theta = thetaLut[pp.gx];
+      int ty = cy + (int)(amp * cosf(theta * rowMul[pp.gy] + phase));
+
+      // Interpolate from QR sample pos → wave target pos during morph.
+      int x = pp.sx + (int)((tx - pp.sx) * mp);
+      int y = pp.sy + (int)((ty - pp.sy) * mp);
+
+      // During fly phase, move horizontally off-screen from the line center.
+      if (flyP > 0.0f) {
+        // Ease-in for fly-away for a snappier exit.
+        float fp = flyP * flyP;
+        // Move up to ~1.5 screen widths so particles disappear.
+        x += (int)(pp.dir * fp * 384.0f);
+        // Flatten y fully by fly time.
+        y = cy;
+      }
+
+      // Draw a filled rectangle roughly sized to QR tile
+      speccy.fillRect(x - halfWH, y - halfWH, halfWH << 1, halfWH << 1, pp.color);
+    }
+
+    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+  }
 }
 
 void loop() {
@@ -526,6 +634,7 @@ void loop() {
 
   // QR code.
   runQR();
+  runQrToWave();
 
   delay(3000);
 }

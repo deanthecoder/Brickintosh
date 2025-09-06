@@ -97,10 +97,12 @@ int main(int argc, char* argv[])
     SDL_QueryTexture(tex, &pf, &acc, &w, &h);
     SDL_Log("Texture %dx%d format=0x%x access=%d", w, h, pf, acc);
 
-    // Make sure your Arduino state is initialized.
-    setup();
+    while (true) {
+        // Make sure your Arduino state is initialized.
+        setup();
 
-    loop(); // let the sketch run
+        loop(); // let the sketch run
+    }
 
     return 0;
 }
