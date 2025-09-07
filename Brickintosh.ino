@@ -687,6 +687,111 @@ static void runFire() {
   }
 }
 
+static void runAmigaBall() {
+  const float invPi = 1.0f / M_PI;
+  const int ballRadius = 40;
+  const int ballR2 = ballRadius * ballRadius;
+  int ballX = 128;
+  int ballY = 64;
+  int ballDx = 1;
+  float ballDy = 0.0f;         // Use float for smoother motion
+  float ballAy = 0.35f;        // Gravity acceleration (pixels/frame^2)
+  int ballDUv = 0;
+
+  long t0 = millis();
+  while (millis() - t0 < 20000) {
+    long frameStart = millis();
+
+    // Update ball X position.
+    if (ballX + ballDx * 3 - ballRadius < 0)
+      ballDx = 1;
+    else if (ballX + ballDx * 3 + ballRadius >= 256)
+      ballDx = -1;
+    ballX += ballDx * 2;
+    ballDUv += (ballDx > 0) ? 1 : -1; // Spin the ball
+
+    // Update ball Y position (under gravity).
+    ballDy += ballAy;           // Apply gravity
+    ballY += (int)ballDy;       // Move ball
+
+    // Bounce off floor
+    if (ballDy > 0 && ballY + ballRadius >= 152) {
+      ballY = 152 - ballRadius;
+      ballDy = -ballDy * 1.05f;
+    }
+
+    // Clear frame.
+    speccy.startFrame();
+    speccy.clear(0xad55);
+
+    // Draw ball shadow.
+    for (int dx = -ballRadius; dx <= ballRadius; ++dx) {
+      int nx2 = dx * dx;
+
+      for (int dy = -ballRadius; dy <= ballRadius; ++dy) {
+        if (nx2 + dy * dy < ballR2)
+          speccy.plot(ballX + dx + 16, ballY + dy, 0x632c);
+      }
+    }
+
+    // Draw background.
+    for (int y = 0; y <= 144; y += 12)
+      speccy.hline(56, y + 2, 144, 0xa815);
+    for (int x = 0; x <= 144; x += 12) {
+      speccy.vline(56 + x, 2, 144, 0xa815);
+      speccy.writeLine(56 + x, 146, 40 + x + x * 32 / 144, 156, 0xa815);
+    }
+    for (int i = 0, ii = 2; i < 4; i++, ii += i + 1) {
+      speccy.hline(56 - ii * 3 / 2, 146 + ii, 145 + ii * 3, 0xa815);
+    }
+\
+    // Draw ball.
+    for (int dx = -ballRadius; dx <= ballRadius; ++dx) {
+      float nx = (float)dx / (float)ballRadius; // -1..1
+      float nx2 = nx * nx;
+
+      for (int dy = -ballRadius; dy <= ballRadius; ++dy) {
+        float ny = (float)dy / (float)ballRadius; // -1..1
+        float r2 = nx2 + ny * ny;
+
+        if (r2 <= 1.0f) {
+          // Calculate z for the sphere surface
+          float nz = sqrtf(1.0f - r2);
+
+          int x = ballX + dx;
+          int y = ballY + dy;
+
+          // Environment mapping: use normal to get UV
+          float u = 0.5f + atan2f(nx, nz) * invPi;
+          float v = 0.5f - asinf(ny) * invPi;
+
+          u += ballDUv * 0.05f;
+
+          // Rotate u/v by 45 degrees.
+          float u2 = u - 0.5f;
+          float v2 = v - 0.5f;
+          float s = sinf(0.25f); // 45 degrees
+          float c = cosf(0.25f);
+          u = (u2 * c - v2 * s) + 50.5f;
+          v = (u2 * s + v2 * c) + 50.5f;
+
+          // Checkerboard pattern
+          int checkU = int(u * 8.0f);
+          int checkV = int(v * 8.0f);
+          speccy.plot(x, y, ((checkU + checkV) & 1) == 0 ? WHITE : RED);
+        }
+      }
+    }
+
+    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+
+    // Limit FPS
+    long dt = millis() - frameStart;
+    const long frameMs = 1000 / 20;
+    if (dt < frameMs) delay(frameMs - dt);
+  }
+}
+
 void loop() {
   // Black flash and memory test, up to '1982 Sinclair Research Ltd'
   runSpeccyBoot();
@@ -709,6 +814,9 @@ void loop() {
 
   // Fire.
   runFire();
+
+  // Amiga ball.
+  runAmigaBall();
 
   delay(3000);
 }

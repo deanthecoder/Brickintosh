@@ -51,6 +51,24 @@ public:
         }
     }
 
+    // writeLine(x, y, x2, y2, col)
+    void writeLine(int x0, int y0, int x1, int y1, uint16_t col) {
+        int dx = x1 - x0;
+        int dy = y1 - y0;
+        int sx = (dx >= 0) ? 1 : -1;
+        int sy = (dy >= 0) ? 1 : -1;
+        dx = sx * dx; // abs(dx)
+        dy = sy * dy; // abs(dy)
+        int err = dx - dy;
+        for (;;) {
+            plot(x0, y0, col);
+            if (x0 == x1 && y0 == y1) break;
+            int e2 = err << 1;
+            if (e2 > -dy) { err -= dy; x0 += sx; }
+            if (e2 <  dx) { err += dx; y0 += sy; }
+        }
+    }
+
     // Draw an RGB565 image scaled and centered at (cx, cy) in logical 256x192 space.
     // scale: 0..1.0  (0 => nothing, 1 => full size)
     void writeImageScaled(const uint16_t* img, int srcW, int srcH, int cx, int cy, float scale) {
@@ -77,7 +95,6 @@ public:
         }
     }
     
-    /*
     void hline(int x, int y, int w, uint16_t col) {
         if ((unsigned)y >= 192 || w <= 0) return;
         if (x < 0) { w += x; x = 0; }
@@ -111,7 +128,6 @@ public:
         if (c0 < _left[row])  _left[row]  = c0;
         if (c1 > _right[row]) _right[row] = c1;
     }
-    */
 
     // Draw a filled rect in logical space (handy + updates spans correctly).
     void fillRect(int x, int y, int w, int h, uint16_t col) {
