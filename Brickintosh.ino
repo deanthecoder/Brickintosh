@@ -641,21 +641,25 @@ static void runFire() {
   // Clear buffer
   memset(buf, 0, sizeof(buf));
 
+  // Base line randoms.
+  uint8_t seeds[W];
+  for (int x = 0; x < W; ++x)
+    seeds[x] = (uint8_t)random();
+
   const long t0 = millis();
-  while (millis() - t0 < 8000) {
+  while (millis() - t0 < 20000) {
     long frameStart = millis();
 
-    // Seed bottom row with noise
-    for (int x = 0; x < W; ++x) {
-      uint8_t f = ((uint8_t)random());
-      buf[H - 1][x] = f;
-    }
+    // Seed bottom row with noise, based on sine wave + random
+    for (int x = 0; x < W; ++x)
+      buf[H - 1][x] = (uint8_t)(155 + 100 * sinf((frameStart + seeds[x]) * seeds[x] / 256.0f * 0.01f));
 
     // Propagate upwards (compute from bottom-2 up to top)
     for (int y = 0; y < H - 1; y++) {
       const uint8_t* nextRow = buf[y + 1];
       const uint8_t* nextNextRow = (y + 2 < H) ? buf[y + 2] : nextRow;
       uint8_t* row = buf[y];
+
       row[0] = 0;  // edges cool fast
       for (int x = 1; x < W - 1; ++x) {
         int sum = nextRow[x - 1] + nextRow[x] + nextRow[x + 1] + nextNextRow[x];
@@ -664,10 +668,10 @@ static void runFire() {
       row[W - 1] = 0;
     }
 
-    // Draw to speccy framebuffer (each logical column spans 4 pixels)
+    // Draw to speccy framebuffer.
     speccy.startFrame();
     for (int y = 0; y < H - 1; ++y) {
-      int sy = y * 2;
+      int sy = (y + 1) * 2;
       for (int x = 0; x < W; ++x) {
         uint16_t c = pal[buf[y][x]];
         speccy.fillRect(x * 2, sy, 2, 2, c);
