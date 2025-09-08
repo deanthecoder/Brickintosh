@@ -792,31 +792,124 @@ static void runAmigaBall() {
   }
 }
 
+static void runDonut() {
+  // ASCII donut adapted to SpeccyFB using 2x2 filled pixels + simple z-buffer.
+  // Based on the classic a1k0n donut math, but shaded by luminance into RGB565.
+  // Logical render size is 128x96 (maps to 256x192 by drawing 2x2 blocks).
+
+  // Tunables
+  const float THETA_SPACING = 0.04f;
+  const float PHI_SPACING   = 0.01f;
+  const float R1 = 0.7f;           // small radius
+  const float R2 = 2.0f;           // big radius
+  const float K2 = 5.0f;           // distance from viewer
+  const int   LW = 128;            // logical width  (×2 -> 256)
+  const int   LH = 96;             // logical height (×2 -> 192)
+
+  // Colors
+  const uint16_t BG     = gfx.color565(26, 28, 44);    // deep blue-ish background
+  const uint16_t DONUT0 = gfx.color565(255, 120, 16);  // warm orange
+
+  // k1 matches a1k0n's derivation (scaled for our logical width)
+  const float k1 = (float)LW * K2 * 2.0f / (8.0f * (R1 + R2));
+
+  // Simple animation timing
+  const long t0 = millis();
+  const long DURATION_MS = 20000;   // run for 20 seconds
+  const float A_SPEED = 0.9f;       // radians/sec
+  const float B_SPEED = 0.35f;      // radians/sec
+
+  // Z-buffer (ooz) for logical pixels
+  static float zbuf[LW][LH];
+
+  while (millis() - t0 < DURATION_MS) {
+    long frameStart = millis();
+
+    // Compute rotation angles from time for smoothness
+    float tsec = (frameStart - t0) / 1000.0f;
+    float a = 0.2f + A_SPEED * tsec;
+    float b = 0.1f + B_SPEED * tsec;
+
+    // Precompute sin/cos of A/B
+    const float cosA = cosf(a), sinA = sinf(a);
+    const float cosB = cosf(b), sinB = sinf(b);
+
+    // Clear z-buffer
+    memset(zbuf, 0, sizeof(zbuf));
+    
+    // Begin frame
+    speccy.startFrame();
+    speccy.clear(BG);
+
+    // Theta loop
+    for (float theta = 0.0f; theta < TWO_PI; theta += THETA_SPACING) {
+      float cosT = cosf(theta), sinT = sinf(theta);
+
+      // Factors reused across phi
+      float f1 = sinB * cosT;
+      float f2 = cosA * cosT;
+      float f3 = sinA * sinT;
+      float f4 = cosA * sinT;
+      float f5 = sinA * cosT;
+
+      float circleX = R2 + R1 * cosT;
+      float circleY = R1 * sinT;
+
+      // Phi loop
+      for (float phi = 0.0f; phi < TWO_PI; phi += PHI_SPACING) {
+        float cosP = cosf(phi), sinP = sinf(phi);
+
+        // Luminance (point-light at viewer)
+        float L = cosP * f1 - f2 * sinP - f3 + cosB * (f4 - f5 * sinP);
+        if (L < 0.05f) L = 0.05f;
+
+        // 3D → camera
+        const float x = circleX * (cosB * cosP + sinA * sinB * sinP) - circleY * cosA * sinB;
+        const float y = circleX * (sinB * cosP - sinA * cosB * sinP) + circleY * cosA * cosB;
+        const float z = K2 + cosA * circleX * sinP + circleY * sinA;
+        const float ooz = 1.0f / z;
+
+        // Projection to logical coords
+        const int xp = (int)(LW / 2.0f + k1 * ooz * x);
+        const int yp = (int)(LH / 2.0f - k1 * ooz * y);
+
+        // Z-test
+        if (ooz > zbuf[xp][yp]) {
+          zbuf[xp][yp] = ooz;
+
+          // Shade donut color.
+          const float shade = 0.4f + 0.8f * (L > 1.0f ? 1.0f : L);
+          const uint16_t c = scaleRgb565(DONUT0, shade);
+
+          // Draw voxel.
+          speccy.fillRect(xp * 2, yp * 2, 2, 2, c);
+        }
+      }
+    }
+
+    // Blit to the screen inside the Mac window area (same placement as other effects)
+    speccy.endFrame(gfx,
+                    (gfx.width() - MacWindow_w) / 2 + 4,
+                    (gfx.height() - 256) / 2);
+
+    // Cap frame rate ~20 fps
+    long dt = millis() - frameStart;
+    const long frameMs = 1000 / 20;
+    if (dt < frameMs) delay(frameMs - dt);
+  }
+}
+
 void loop() {
-  // Black flash and memory test, up to '1982 Sinclair Research Ltd'
   runSpeccyBoot();
-
-  // LOAD "macos" + screen load sequence.
   runSpeccyLoad();
-
-  // Mac OS 9 boot logo and progress bar.
   runMacBoot();
-
-  // Show OS 9 main menu and demo window.
   runMacMenu();
-
-  // Tunnel.
   runTunnel();
-
-  // QR code.
   runQR();
   runQrToWave();
-
-  // Fire.
   runFire();
-
-  // Amiga ball.
   runAmigaBall();
+  runDonut();
 
   delay(3000);
 }
