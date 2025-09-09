@@ -167,6 +167,14 @@ public:
         tft.endWrite();
     }
 
+    // Get a pointer to a specific row of a specific tile in a sprite sheet.
+    uint16_t* getSpriteSheetTileRow(uint16_t* sheet, int sheetW, int tileW, int tileH, int tileIndex, int pixelRow) {
+        const int tilesPerRow = sheetW / tileW;
+        const int tileX = (tileIndex % tilesPerRow) * tileW;
+        const int tileY = (tileIndex / tilesPerRow) * tileH;
+        return sheet + (tileY + pixelRow) * sheetW + tileX;
+    }
+
 private:
     uint16_t* _fb;
     bool      _dirty[256];

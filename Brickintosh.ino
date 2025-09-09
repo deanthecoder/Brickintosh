@@ -744,7 +744,7 @@ static void runAmigaBall() {
     for (int i = 0, ii = 2; i < 4; i++, ii += i + 1) {
       speccy.hline(56 - ii * 3 / 2, 146 + ii, 145 + ii * 3, 0xa815);
     }
-\
+
     // Draw ball.
     for (int dx = -ballRadius; dx <= ballRadius; ++dx) {
       float nx = (float)dx / (float)ballRadius; // -1..1
@@ -899,6 +899,83 @@ static void runDonut() {
   }
 }
 
+static void runRain() {
+  struct Glyphs {
+    int16_t y;      // position in speccy text coords
+    uint8_t length; // length in glyphs
+  };
+  constexpr int MAX_GLYPHS = 32;
+  Glyphs glyphs[MAX_GLYPHS];
+
+  // Initialize glyph runs.
+  for (int i = 0; i < MAX_GLYPHS; ++i) {
+    glyphs[i].length = 5 + (random() % 10);
+    glyphs[i].y = (random() % 24) - glyphs[i].length;
+  }
+
+  long t0 = millis();
+  while (millis() - t0 < 20000) {
+    long frameStart = millis();
+
+    // Update glyph positions.
+    for (int i = 0; i < MAX_GLYPHS; ++i) {
+      Glyphs &g = glyphs[i];
+      g.y++;
+      if (g.y > 24) {
+        g.length = 5 + (random() % 10);
+        g.y = -g.length;
+      }
+    }
+
+    // Render frame
+    speccy.startFrame();
+    speccy.clear(BLACK);
+
+    for (int i = 0; i < MAX_GLYPHS; ++i) {
+      Glyphs &g = glyphs[i];
+      int sx = i * 8;
+
+      for (int j = 0; j < g.length; j++) {
+        int glyphIndex = random() % 26;
+        float brightness = (j + 1.0f) / g.length;
+
+        // Darken every other column.
+        brightness *= (i & 1) ? 0.3f : 1.0f;
+
+        // Brighten last glyph.
+        if (j == g.length - 1)
+          brightness *= 1.5f;
+
+        // Draw glyph (8x8 pixels)
+        for (int y = 0; y < 8; ++y) {
+          int sy = (g.y + j) * 8 + y;
+          if (sy < 0) continue; // off top of screen
+          if (sy >= 192) break; // off bottom of screen
+
+          uint16_t* img = speccy.getSpriteSheetTileRow((uint16_t*)Rain_map, Rain_W, 8, 8, glyphIndex, y);
+          for (int x = 0; x < 8; ++x) {
+            uint16_t c = img[x];
+            if (c != BLACK) {
+              // Scale color by brightness.
+              int green = (c >> 5) & 0x3F;
+
+              c = scaleRgb565(0x0768, brightness * green / 32.0f);
+              speccy.plot(sx + x, sy, c);
+            }
+          }
+        }
+      }
+    }
+    
+    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+
+    // Cap frame rate.
+    long dt = millis() - frameStart;
+    const long frameMs = 1000 / 8;
+    if (dt < frameMs) delay(frameMs - dt);
+  }
+}
+
 void loop() {
   runSpeccyBoot();
   runSpeccyLoad();
@@ -910,6 +987,7 @@ void loop() {
   runFire();
   runAmigaBall();
   runDonut();
+  runRain();
 
   delay(3000);
 }
