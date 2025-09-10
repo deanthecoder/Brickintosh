@@ -978,18 +978,85 @@ static void runRain() {
   }
 }
 
+static void runConway() {
+  constexpr int GW = 64;   // grid width
+  constexpr int GH = 48;   // grid height
+  static bool grid[GW][GH];
+  static bool newGrid[GW][GH];
+
+  // Randomize initial state.
+  for (int y = 0; y < GH; ++y)
+    for (int x = 0; x < GW; ++x)
+      grid[x][y] = (random() % 4) == 0;
+
+  long t0 = millis();
+  while (millis() - t0 < 20000) {
+    long frameStart = millis();
+
+    // Compute next generation.
+    for (int y = 0; y < GH; ++y) {
+      int yUp = (y == 0) ? (GH - 1) : (y - 1);
+      int yDn = (y == GH - 1) ? 0 : (y + 1);
+
+      for (int x = 0; x < GW; ++x) {
+        int xL = (x == 0) ? (GW - 1) : (x - 1);
+        int xR = (x == GW - 1) ? 0 : (x + 1);
+
+        // Count neighbors
+        int n = 0;
+        if (grid[xL][yUp]) n++;
+        if (grid[x][yUp]) n++;
+        if (grid[xR][yUp]) n++;
+        if (grid[xL][y]) n++;
+        if (grid[xR][y]) n++;
+        if (grid[xL][yDn]) n++;
+        if (grid[x][yDn]) n++;
+        if (grid[xR][yDn]) n++;
+
+        // Conway's rules
+        if (grid[x][y])
+          newGrid[x][y] = (n == 2 || n == 3);
+        else
+          newGrid[x][y] = (n == 3);
+      }
+    }
+
+    // Swap grids
+    memcpy(grid, newGrid, sizeof(grid));
+
+    // Render frame
+    speccy.startFrame();
+    speccy.clear(BLACK);
+
+    for (int y = 0; y < GH; ++y) {
+      for (int x = 0; x < GW; ++x) {
+        if (grid[x][y])
+          speccy.fillRect(x * 4, y * 4, 3, 3, 0x07E0);
+      }
+    }
+  
+    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+
+    // Cap frame rate.
+    long dt = millis() - frameStart;
+    const long frameMs = 1000 / 6;
+    if (dt < frameMs) delay(frameMs - dt);
+  }
+}
+
 void loop() {
-  //runSpeccyBoot();
-  //runSpeccyLoad();
-  //runMacBoot();
+  runSpeccyBoot();
+  runSpeccyLoad();
+  runMacBoot();
   runMacMenu();
-  //runTunnel();
-  //runQR();
-  //runQrToWave();
-  //runFire();
-  //runAmigaBall();
-  //runDonut();
+  runTunnel();
+  runQR();
+  runQrToWave();
+  runFire();
+  runAmigaBall();
+  runDonut();
   runRain();
+  runConway();
 
   delay(3000);
 }
