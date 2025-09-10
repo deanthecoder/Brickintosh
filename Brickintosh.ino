@@ -947,13 +947,15 @@ static void runRain() {
           brightness *= 1.5f;
 
         // Draw glyph (8x8 pixels)
-        for (int y = 0; y < 8; ++y) {
+        constexpr int TileW = 6;
+        constexpr int TileH = 7;
+        for (int y = 0; y < TileH; ++y) {
           int sy = (g.y + j) * 8 + y;
           if (sy < 0) continue; // off top of screen
           if (sy >= 192) break; // off bottom of screen
 
-          uint16_t* img = speccy.getSpriteSheetTileRow((uint16_t*)Rain_map, Rain_W, 8, 8, glyphIndex, y);
-          for (int x = 0; x < 8; ++x) {
+          uint16_t* img = speccy.getSpriteSheetTileRow((uint16_t*)Rain_map, Rain_W, TileW, TileH, glyphIndex, y);
+          for (int x = 0; x < TileW; ++x) {
             uint16_t c = img[x];
             if (c != BLACK) {
               // Scale color by brightness.
@@ -977,16 +979,16 @@ static void runRain() {
 }
 
 void loop() {
-  runSpeccyBoot();
-  runSpeccyLoad();
-  runMacBoot();
+  //runSpeccyBoot();
+  //runSpeccyLoad();
+  //runMacBoot();
   runMacMenu();
-  runTunnel();
-  runQR();
-  runQrToWave();
-  runFire();
-  runAmigaBall();
-  runDonut();
+  //runTunnel();
+  //runQR();
+  //runQrToWave();
+  //runFire();
+  //runAmigaBall();
+  //runDonut();
   runRain();
 
   delay(3000);
