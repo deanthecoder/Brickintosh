@@ -798,29 +798,44 @@ static void runDonut() {
   // Logical render size is 128x96 (maps to 256x192 by drawing 2x2 blocks).
 
   // Tunables
-  const float THETA_SPACING = 0.04f;
-  const float PHI_SPACING   = 0.01f;
-  const float R1 = 0.7f;           // small radius
-  const float R2 = 2.0f;           // big radius
-  const float K2 = 5.0f;           // distance from viewer
-  const int   LW = 128;            // logical width  (×2 -> 256)
-  const int   LH = 96;             // logical height (×2 -> 192)
+  constexpr float THETA_SPACING = 0.04f;
+  constexpr float PHI_SPACING   = 0.01f;
+  constexpr float R1 = 0.7f;           // small radius
+  constexpr float R2 = 2.0f;           // big radius
+  constexpr float K2 = 5.0f;           // distance from viewer
+  constexpr int   LW = 128;            // logical width  (×2 -> 256)
+  constexpr int   LH = 96;             // logical height (×2 -> 192)
 
   // Colors
   const uint16_t BG     = gfx.color565(26, 28, 44);    // deep blue-ish background
   const uint16_t DONUT0 = gfx.color565(255, 120, 16);  // warm orange
+
+  uint16_t rgbLookup[32];
+  for (int i = 0; i < 32; ++i)
+    rgbLookup[i] = scaleRgb565(DONUT0, 0.4f + 0.8f * i / 31.0f);
+
+  // Precals trig.
+  constexpr int NTHETA = int(TWO_PI / THETA_SPACING) + 1;
+  constexpr int NPHI   = int(TWO_PI / PHI_SPACING) + 1;
+  static float cosTheta[NTHETA], sinTheta[NTHETA];
+  static float cosPhi[NPHI], sinPhi[NPHI];
+  for (int i = 0; i < NTHETA; ++i) {
+      cosTheta[i] = cosf(i * THETA_SPACING);
+      sinTheta[i] = sinf(i * THETA_SPACING);
+  }
+  for (int i = 0; i < NPHI; ++i) {
+      cosPhi[i] = cosf(i * PHI_SPACING);
+      sinPhi[i] = sinf(i * PHI_SPACING);
+  }
 
   // k1 matches a1k0n's derivation (scaled for our logical width)
   const float k1 = (float)LW * K2 * 2.0f / (8.0f * (R1 + R2));
 
   // Simple animation timing
   const long t0 = millis();
-  const long DURATION_MS = 20000;   // run for 20 seconds
-  const float A_SPEED = 0.9f;       // radians/sec
-  const float B_SPEED = 0.35f;      // radians/sec
-
-  // Z-buffer (ooz) for logical pixels
-  static float zbuf[LW][LH];
+  constexpr long DURATION_MS = 20000;   // run for 20 seconds
+  constexpr float A_SPEED = 0.9f;       // radians/sec
+  constexpr float B_SPEED = 0.35f;      // radians/sec
 
   while (millis() - t0 < DURATION_MS) {
     long frameStart = millis();
@@ -833,8 +848,13 @@ static void runDonut() {
     // Precompute sin/cos of A/B
     const float cosA = cosf(a), sinA = sinf(a);
     const float cosB = cosf(b), sinB = sinf(b);
+    const float sinAsinB = sinA * sinB;
+    const float sinAcosB = sinA * cosB;
+    const float cosAsinB = cosA * sinB;
+    const float cosAcosB = cosA * cosB;
 
     // Clear z-buffer
+    static uint16_t zbuf[LH][LW];
     memset(zbuf, 0, sizeof(zbuf));
     
     // Begin frame
@@ -842,47 +862,57 @@ static void runDonut() {
     speccy.clear(BG);
 
     // Theta loop
-    for (float theta = 0.0f; theta < TWO_PI; theta += THETA_SPACING) {
-      float cosT = cosf(theta), sinT = sinf(theta);
+    for (int i = 0; i < NTHETA; ++i) {
+      const float cosT = cosTheta[i];
+      const float sinT = sinTheta[i];
 
       // Factors reused across phi
-      float f1 = sinB * cosT;
-      float f2 = cosA * cosT;
-      float f3 = sinA * sinT;
-      float f4 = cosA * sinT;
-      float f5 = sinA * cosT;
+      const float f1 = sinB * cosT;
+      const float f2 = cosA * cosT;
+      const float f3 = sinA * sinT;
+      const float f4 = cosA * sinT;
+      const float f5 = sinA * cosT;
 
-      float circleX = R2 + R1 * cosT;
-      float circleY = R1 * sinT;
+      const float circleX = R2 + R1 * cosT;
+      const float circleY = R1 * sinT;
+      const float circleXcosA = circleX * cosA;
+      const float circleYsinA = circleY * sinA;
+      const float circleYcosAsinB = circleY * cosAsinB;
+      const float circleYcosAcosB = circleY * cosAcosB;
+      const float cXcosB = circleX * cosB;
+      const float cXsinB = circleX * sinB;
+      const float cXsinAsinB = circleX * sinAsinB;
+      const float cXsinAcosB = circleX * sinAcosB;
+      const float K2PluscircleYsinA = K2 + circleYsinA;
 
       // Phi loop
-      for (float phi = 0.0f; phi < TWO_PI; phi += PHI_SPACING) {
-        float cosP = cosf(phi), sinP = sinf(phi);
-
-        // Luminance (point-light at viewer)
-        float L = cosP * f1 - f2 * sinP - f3 + cosB * (f4 - f5 * sinP);
-        if (L < 0.05f) L = 0.05f;
+      for (int j = 0; j < NPHI; ++j) {
+        const float cosP = cosPhi[j];
+        const float sinP = sinPhi[j];
 
         // 3D → camera
-        const float x = circleX * (cosB * cosP + sinA * sinB * sinP) - circleY * cosA * sinB;
-        const float y = circleX * (sinB * cosP - sinA * cosB * sinP) + circleY * cosA * cosB;
-        const float z = K2 + cosA * circleX * sinP + circleY * sinA;
+        const float x = cXcosB * cosP + cXsinAsinB * sinP - circleYcosAsinB;
+        const float y = cXsinB * cosP - cXsinAcosB * sinP + circleYcosAcosB;
+        const float z = circleXcosA * sinP + K2PluscircleYsinA;
         const float ooz = 1.0f / z;
 
         // Projection to logical coords
-        const int xp = (int)(LW / 2.0f + k1 * ooz * x);
-        const int yp = (int)(LH / 2.0f - k1 * ooz * y);
+        const float k1ooz = k1 * ooz;
+        const int xp = (int)(LW / 2 + k1ooz * x);
+        const int yp = (int)(LH / 2 - k1ooz * y);
 
-        // Z-test
-        if (ooz > zbuf[xp][yp]) {
-          zbuf[xp][yp] = ooz;
+        // Z-test (bigger is closer).
+        const uint16_t zf = (uint16_t)(ooz * 65535.0f);
+        if (zf > zbuf[yp][xp]) {
+          zbuf[yp][xp] = zf;
 
-          // Shade donut color.
-          const float shade = 0.4f + 0.8f * (L > 1.0f ? 1.0f : L);
-          const uint16_t c = scaleRgb565(DONUT0, shade);
+          // Luminance (point-light at viewer)
+          float L = cosP * f1 - f2 * sinP - f3 + cosB * (f4 - f5 * sinP);
+          L = fminf(fmaxf(L, 0.05f), 1.0f);
 
           // Draw voxel.
-          speccy.fillRect(xp * 2, yp * 2, 2, 2, c);
+          const uint16_t shadeIndex = (uint16_t)(L * 31.0f);
+          speccy.fillRect(xp * 2, yp * 2, 2, 2, rgbLookup[shadeIndex]);
         }
       }
     }
@@ -891,11 +921,6 @@ static void runDonut() {
     speccy.endFrame(gfx,
                     (gfx.width() - MacWindow_w) / 2 + 4,
                     (gfx.height() - 256) / 2);
-
-    // Cap frame rate ~20 fps
-    long dt = millis() - frameStart;
-    const long frameMs = 1000 / 20;
-    if (dt < frameMs) delay(frameMs - dt);
   }
 }
 
