@@ -647,12 +647,20 @@ static void runFire() {
     seeds[x] = (uint8_t)random();
 
   const long t0 = millis();
-  while (millis() - t0 < 20000) {
+  float elapsed;
+  while ((elapsed = millis() - t0) < 20000) {
     long frameStart = millis();
 
     // Seed bottom row with noise, based on sine wave + random
+    if (elapsed < 15000) {
+      for (int x = 0; x < W; ++x)
+        buf[H - 1][x] = (uint8_t)(155 + (random() & 0x3F) * sinf((frameStart + seeds[x]) * seeds[x] / 256.0f * 0.01f));
+    } else {
+      // Last 5 seconds, just fade out.
     for (int x = 0; x < W; ++x)
-      buf[H - 1][x] = (uint8_t)(155 + 100 * sinf((frameStart + seeds[x]) * seeds[x] / 256.0f * 0.01f));
+        buf[H - 1][x] = (uint8_t)(buf[H - 1][x] * 0.95f);
+    }
+  
 
     // Propagate upwards (compute from bottom-2 up to top)
     for (int y = 0; y < H - 1; y++) {
