@@ -440,9 +440,9 @@ static void runTunnel() {
   long t = millis();
   int o = 0;
   float ringStart = 0.0f;
+  speccy.clear(BLACK);
   while (true) {
     speccy.startFrame();
-    speccy.clear(BLACK);
 
     for (int i = ringStart; i < RINGS; i++) {
       int bright = 16 * sinf((i + o * 0.6f) * 1.5f);
@@ -466,7 +466,7 @@ static void runTunnel() {
       }
     }
 
-    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2, true);
 
     o++;
 
@@ -489,7 +489,7 @@ static void runQR() {
     float s = p * p * (3.0f - 2.0f * p);   // smoothstep(0,1,p)
     speccy.startFrame();
     speccy.writeImageScaled((uint16_t*)QR_map, QR_w, QR_h, 256 / 2, 192 / 2, s);
-    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2, false);
   }
 
   delay(4000);
@@ -566,6 +566,7 @@ static void runQrToWave() {
   const int halfWH = 4;
 
   // Render frames until animation completes.
+  speccy.clear(BLACK);
   long now;
   while ((now = millis()) - t0 < (long)totalDur + 60) {
     float t = (float)(now - t0);
@@ -583,7 +584,6 @@ static void runQrToWave() {
     float amp = baseAmp * (1.0f - waveP);
 
     speccy.startFrame();
-    speccy.clear(BLACK);
 
     // Draw particles
     for (int i = 0; i < PN; ++i) {
@@ -612,7 +612,7 @@ static void runQrToWave() {
       speccy.fillRect(x - halfWH, y - halfWH, halfWH << 1, halfWH << 1, pp.color);
     }
 
-    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2, true);
   }
 }
 
@@ -657,10 +657,9 @@ static void runFire() {
         buf[H - 1][x] = (uint8_t)(155 + (random() & 0x3F) * sinf((frameStart + seeds[x]) * seeds[x] / 256.0f * 0.01f));
     } else {
       // Last 5 seconds, just fade out.
-    for (int x = 0; x < W; ++x)
+      for (int x = 0; x < W; ++x)
         buf[H - 1][x] = (uint8_t)(buf[H - 1][x] * 0.95f);
     }
-  
 
     // Propagate upwards (compute from bottom-2 up to top)
     for (int y = 0; y < H - 1; y++) {
@@ -686,7 +685,7 @@ static void runFire() {
       }
     }
 
-    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2, false);
 
     // Limit FPS
     long dt = millis() - frameStart;
@@ -706,6 +705,7 @@ static void runAmigaBall() {
   float ballAy = 0.35f;        // Gravity acceleration (pixels/frame^2)
   int ballDUv = 0;
 
+  speccy.clear(0xad55);
   long t0 = millis();
   while (millis() - t0 < 20000) {
     long frameStart = millis();
@@ -730,7 +730,6 @@ static void runAmigaBall() {
 
     // Clear frame.
     speccy.startFrame();
-    speccy.clear(0xad55);
 
     // Draw ball shadow.
     for (int dx = -ballRadius; dx <= ballRadius; ++dx) {
@@ -791,7 +790,7 @@ static void runAmigaBall() {
       }
     }
 
-    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2, true);
 
     // Limit FPS
     long dt = millis() - frameStart;
@@ -845,6 +844,7 @@ static void runDonut() {
   constexpr float A_SPEED = 0.9f;       // radians/sec
   constexpr float B_SPEED = 0.35f;      // radians/sec
 
+  speccy.clear(BG);
   while (millis() - t0 < DURATION_MS) {
     long frameStart = millis();
 
@@ -867,7 +867,6 @@ static void runDonut() {
     
     // Begin frame
     speccy.startFrame();
-    speccy.clear(BG);
 
     // Theta loop
     for (int i = 0; i < NTHETA; ++i) {
@@ -928,7 +927,8 @@ static void runDonut() {
     // Blit to the screen inside the Mac window area (same placement as other effects)
     speccy.endFrame(gfx,
                     (gfx.width() - MacWindow_w) / 2 + 4,
-                    (gfx.height() - 256) / 2);
+                    (gfx.height() - 256) / 2,
+                    true);
   }
 }
 
@@ -946,6 +946,7 @@ static void runRain() {
     glyphs[i].y = (random() % 24) - glyphs[i].length;
   }
 
+  speccy.clear(BLACK);
   long t0 = millis();
   while (millis() - t0 < 20000) {
     long frameStart = millis();
@@ -962,7 +963,6 @@ static void runRain() {
 
     // Render frame
     speccy.startFrame();
-    speccy.clear(BLACK);
 
     for (int i = 0; i < MAX_GLYPHS; ++i) {
       Glyphs &g = glyphs[i];
@@ -1002,7 +1002,7 @@ static void runRain() {
       }
     }
     
-    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2, true);
 
     // Cap frame rate.
     long dt = millis() - frameStart;
@@ -1022,6 +1022,7 @@ static void runConway() {
     for (int x = 0; x < GW; ++x)
       grid[x][y] = (random() % 4) == 0;
 
+  speccy.clear(BLACK);
   long t0 = millis();
   while (millis() - t0 < 20000) {
     long frameStart = millis();
@@ -1059,7 +1060,6 @@ static void runConway() {
 
     // Render frame
     speccy.startFrame();
-    speccy.clear(BLACK);
 
     for (int y = 0; y < GH; ++y) {
       for (int x = 0; x < GW; ++x) {
@@ -1068,7 +1068,7 @@ static void runConway() {
       }
     }
   
-    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2);
+    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2, true);
 
     // Cap frame rate.
     long dt = millis() - frameStart;

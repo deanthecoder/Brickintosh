@@ -6,18 +6,14 @@
 
 class SpeccyFB {
 public:
-    SpeccyFB() : _fb(nullptr) {}
+    SpeccyFB() : _fb(nullptr), _background(0xFFFF) {}
 
     bool init() {
         _fb = (uint16_t*) heap_caps_malloc(256 * 192 * sizeof(uint16_t), MALLOC_CAP_INTERNAL);
         if (!_fb)
-        return false;
+            return false;
         
         clear(0x0000);
-        
-        // Mark all dirty initially
-        memset(_dirty, 1, sizeof(_dirty));
-        for (int r = 0; r < 256; ++r) { _left[r] = 0; _right[r] = 191; }
         return true;
     }
 
@@ -26,14 +22,15 @@ public:
     }
 
     void startFrame() {
-        memset(_dirty, 0, sizeof(_dirty));
-        for (int r = 0; r < 256; ++r) { _left[r] = 192; _right[r] = -1; }
+        memset(_dirtyCur, 0, sizeof(_dirtyCur));
     }
 
     void clear(uint16_t c) {
+        _background = c;
         for (int i = 0; i < 256 * 192; ++i) _fb[i] = c;
-        memset(_dirty, 1, sizeof(_dirty));
-        for (int r = 0; r < 256; ++r) { _left[r] = 0; _right[r] = 191; }
+
+        memset(_dirtyCur, 1, sizeof(_dirtyCur));
+        memset(_dirtyPrev, 1, sizeof(_dirtyPrev));
     }
 
     // Logical plot: x∈[0,255], y∈[0,191]. Rotated at write time.
@@ -43,12 +40,9 @@ public:
         const int row = x;
         const int c   = 191 - y;               // stored column
         uint16_t* p   = _fb + row * 192 + c;
-        if (*p != col) {
-            *p = col;
-            _dirty[row] = true;
-            if (c < _left[row])  _left[row]  = c;
-            if (c > _right[row]) _right[row] = c;
-        }
+        if (*p == col) return; // no change
+        *p = col;
+        _dirtyCur[row] = true;
     }
 
     // writeLine(x, y, x2, y2, col)
@@ -105,9 +99,7 @@ public:
         for (int i = 0; i < w; ++i) {
             const int row = x + i;
             _fb[row * 192 + c] = col;
-            _dirty[row] = true;
-            if (c < _left[row])  _left[row]  = c;
-            if (c > _right[row]) _right[row] = c;
+            _dirtyCur[row] = true;
         }
     }
 
@@ -120,13 +112,7 @@ public:
         const int row = x;
         uint16_t* p = _fb + row * 192 + (191 - y);
         for (int j = 0; j < h; ++j) { *p-- = col; }
-        _dirty[row] = true;
-
-        // Span update: vertical line touches contiguous columns [191-(y+h-1) .. 191-y]
-        const int c0 = 191 - (y + h - 1);
-        const int c1 = 191 - y;
-        if (c0 < _left[row])  _left[row]  = c0;
-        if (c1 > _right[row]) _right[row] = c1;
+        _dirtyCur[row] = true;
     }
 
     // Draw a filled rect in logical space (handy + updates spans correctly).
@@ -144,26 +130,42 @@ public:
         for (int rx = x; rx < x + w; ++rx) {
             uint16_t* p = _fb + rx * 192 + c1;
             for (int c = c1; c >= c0; --c) { *p-- = col; }
-            _dirty[rx] = true;
-            if (c0 < _left[rx])  _left[rx]  = c0;
-            if (c1 > _right[rx]) _right[rx] = c1;
+            _dirtyCur[rx] = true;
         }
     }
 
-    // Push only changed spans per dirty row. Assumes in-bounds blit.
-    void endFrame(Arduino_ST7789& tft, int dstX, int dstY) {
+    /// Push only changed spans per dirty row. Assumes in-bounds blit.
+    /// \param clearAfter If true, rows that were dirty in the previous frame are also pushed.
+    ///        This ensures shrinking/erasing objects get cleared on the panel even if the new
+    ///        frame doesn't touch those rows. After presenting, the framebuffer can optionally
+    ///        be cleared back to the background (see code below).
+    ///        If false, only rows touched this frame are sent; the FB is left intact.
+    void endFrame(Arduino_ST7789& tft, int dstX, int dstY, bool clearAfter) {
         tft.startWrite();
-        for (int row = 0; row < 256; ++row) {
-            if (!_dirty[row]) continue;
-            const int left  = _left[row];
-            const int right = _right[row];
-            if (left <= right) {
-                const int w = right - left + 1;
-                tft.writeAddrWindow(dstX + left, dstY + row, w, 1);
-                tft.writePixels(_fb + row * 192 + left, w);
+        int row = 0;
+        while (row < 256) {
+            // Find next dirty run
+            while (row < 256 && !(_dirtyCur[row] || (clearAfter && _dirtyPrev[row]))) ++row;
+            if (row >= 256) break;
+
+            int start = row;
+            int end = row;
+            ++row;
+            while (row < 256 && (_dirtyCur[row] || (clearAfter && _dirtyPrev[row]))) { end = row; ++row; }
+
+            const int h = end - start + 1;
+            tft.writeAddrWindow(dstX, dstY + start, 192, h);
+            tft.writePixels(_fb + start * 192, 192 * h);
+
+            if (clearAfter) {
+                for (int r = start; r <= end; ++r) {
+                    uint16_t* p = _fb + r * 192;
+                    for (int i = 0; i < 192; ++i) p[i] = _background;
+                }
             }
-            _dirty[row] = false;
         }
+        memcpy(_dirtyPrev, _dirtyCur, sizeof(_dirtyCur));
+        memset(_dirtyCur, 0, sizeof(_dirtyCur));
         tft.endWrite();
     }
 
@@ -177,7 +179,7 @@ public:
 
 private:
     uint16_t* _fb;
-    bool      _dirty[256];
-    int16_t   _left[256];
-    int16_t   _right[256];
+    uint16_t  _background;
+    bool      _dirtyCur[256];  // rows touched this frame
+    bool      _dirtyPrev[256]; // rows touched last frame (used for shrink/erase)
 };
