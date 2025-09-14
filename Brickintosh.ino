@@ -617,12 +617,12 @@ static void runQrToWave() {
 }
 
 static void runFire() {
-  constexpr int W = 128;                  // logical fire columns
-  constexpr int H = 96;                  // limit height for speed
+  constexpr int W = 128;                // logical fire columns
+  constexpr int H = 96;                 // limit height for speed
   constexpr int TOP_Y = 192 - H;        // top of fire region on speccy
 
   static uint8_t buf[H][W];             // intensity 0..255
-  uint16_t pal[256];             // RGB565 palette
+  uint16_t pal[256];                    // RGB565 palette
 
   for (int i = 0; i < 256; ++i) {
     int r = 0, g = 0, b = 0;
