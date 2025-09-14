@@ -1077,6 +1077,28 @@ static void runConway() {
   }
 }
 
+static void runPanic() {
+  gfx.fillScreen(0x3186);
+  speccy.clear(0x3186);
+
+  speccy.startFrame();
+  speccy.writeImageScaled((uint16_t*)Panic_map, Panic_W, Panic_H, 128, 96, 1.0f);
+  speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2, false);
+  delay(1000);
+
+  long t = millis();
+  float p;
+  while ((p = (millis() - t) / 3000.0) <= 1.0) {
+    float s = 1.0f + 0.1f * sinf(p * M_PI); // slight pulse
+    speccy.startFrame();
+    speccy.writeImageScaled((uint16_t*)Panic_map, Panic_W, Panic_H, 128, 96, 1.0f);
+    speccy.writeImageTransparent((uint16_t*)Reboot_map, Reboot_W, Reboot_H, 128, 96, p, 8);
+    speccy.endFrame(gfx, (gfx.width() - MacWindow_w) / 2 + 4, (gfx.height() - 256) / 2, false);
+  }
+
+  delay(3000);
+}
+
 void loop() {
   runSpeccyBoot();
   runSpeccyLoad();
@@ -1090,6 +1112,5 @@ void loop() {
   runDonut();
   runRain();
   runConway();
-
-  delay(3000);
+  runPanic();
 }

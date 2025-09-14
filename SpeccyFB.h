@@ -45,6 +45,14 @@ public:
         _dirtyCur[row] = true;
     }
 
+    // Logical peek: x∈[0,255], y∈[0,191]. Rotated at write time.
+    uint16_t peek(int x, int y) const {
+        if ((unsigned)x >= 256 || (unsigned)y >= 192) return 0;
+
+        const int c = 191 - y;
+        return _fb[x * 192 + c];
+    }
+
     // writeLine(x, y, x2, y2, col)
     void writeLine(int x0, int y0, int x1, int y1, uint16_t col) {
         int dx = x1 - x0;
@@ -85,6 +93,76 @@ public:
                 const int sx = (dx * srcW + (dstW >> 1)) / dstW;
                 const int x  = x0 + dx;
                 plot(x, y, srcRow[sx]);
+            }
+        }
+    }
+
+    // Draw an RGB565 image centered at (cx, cy) in logical 256x192 space, where black is transparent.
+    // 'progress' will fade the image to visibility, from top to bottom.
+    void writeImageTransparent(const uint16_t* img, int imgW, int imgH, int cx, int cy, float progress, int barHeight) {
+        const int x0 = cx - (imgW >> 1);
+        const int y0 = cy - (imgH >> 1);
+
+        // Precompute reveal window so that at progress=0 nothing shows,
+        // and at progress=1 the entire image is fully visible.
+        int h = imgH;
+        int bh = barHeight;
+        if (bh < 1) bh = 1;
+        if (bh > h) bh = h;
+        float p = progress;
+        if (p < 0.0f) p = 0.0f; else if (p > 1.0f) p = 1.0f;
+        const int pos  = (int)(p * (h + bh)); // 0..h+bh
+        const int yTop = pos - bh;            // starts at -bh when p=0
+        const int yBot = pos;                 // ends at h+bh when p=1
+
+        for (int y = 0; y < imgH; ++y) {
+            const int dy = y0 + y;
+            const uint16_t* srcRow = img + y * imgW;
+
+            int aRow;                                     // 0..255
+            if (y < yTop) {
+                aRow = 255;                               // fully visible
+            } else if (y >= yBot) {
+                aRow = 0;                                 // invisible
+            } else {
+                // Linear fade within the bar, top=opaque -> bottom=transparent
+                aRow = ((yBot - y) * 255) / bh;           // 1..254
+            }
+
+            if (aRow == 0) continue; // nothing to draw on this row
+
+            for (int x = 0; x < imgW; ++x) {
+                const uint16_t c = srcRow[x];
+                if (!c) continue; // black is transparent
+
+                const int dx = x0 + x;
+                const int dyw = dy;
+
+                if (aRow == 255) {
+                    plot(dx, dyw, c);
+                } else {
+                    // Blend src over destination using 8-bit alpha (fast 565)
+                    const uint16_t d = peek(dx, dyw);
+
+                    // Extract 5/6/5 components
+                    const int sr = (c >> 11) & 0x1F;
+                    const int sg = (c >> 5)  & 0x3F;
+                    const int sb =  c        & 0x1F;
+
+                    const int dr = (d >> 11) & 0x1F;
+                    const int dg = (d >> 5)  & 0x3F;
+                    const int db =  d        & 0x1F;
+
+                    const int a  = aRow;           // 0..255
+                    const int ia = 256 - a;        // 1..256, use >>8
+
+                    const int rr = (dr * ia + sr * a) >> 8;
+                    const int gg = (dg * ia + sg * a) >> 8;
+                    const int bb = (db * ia + sb * a) >> 8;
+
+                    const uint16_t out = (uint16_t)((rr << 11) | (gg << 5) | bb);
+                    plot(dx, dyw, out);
+                }
             }
         }
     }
