@@ -3,8 +3,10 @@
 # 🧱 Brickintosh
 
 A tiny Lego Macintosh powered by an ESP32-S3 + 1.69" LCD display.  
-It looks like a Mac, boots as a ZX Spectrum, loads MacOS 9, and occasionally throws a kernel panic just to keep you guessing.  
+It looks like a Mac, boots as a ZX Spectrum, loads MacOS 8, and occasionally throws a kernel panic just to keep you guessing.  
 Because why settle for one retro system when you can mash them all together?
+
+Brickintosh is just me having fun with retro mashups — hope it makes you smile too.
 
 ---
 
@@ -42,29 +44,56 @@ To run the ESP_SIM emulator on your desktop, ensure you have SDL2 installed. Com
 
 ## 📸 Demo Screenshots
 
-1. **Speccy loading sequence** – Boots up in true ZX Spectrum style before switching gears.  
+1. **Speccy loading sequence**
+
+I wanted to nail that authentic ZX Spectrum vibe before switching things up, so this boots up exactly like the real deal.  I could have gone with an American Megatrends-style BIOS boot, but then I am a fan of the ZX Spectrum.  And what better than to make it look like the Speccy is loading MacOS?
    ![Speccy loading](img/1.png)  
-2. **Loading MacOS** – Watch MacOS 9 come to life on this tiny display.  
-   ![MacOS loading](img/2.png)  
-3. **Tunnel** – Simple pixel tunnel.  
-   ![Tunnel](img/3.png)  
-4. **DeanTheCoder QR code to GitHub site** – Scan to explore the project’s code and details.  
+
+2. **Loading MacOS**
+
+I used a small bitmap for the progress bar, repeating the middle section so it grows as the bar extends.  
+   ![MacOS loading](img/2.png) 
+
+3. **Tunnel**
+
+This simple pixel tunnel is just me playing around with some basic effects to get a nice sense of depth and motion.
+
+It was the first effect I wrote, so gave me some experience of the screen rendering speed on the ESP32. Interestingly the speed was initially *painfully* slow, which I found was due to the graphics library rotating the display for me. From then on I took the rotation into account as I drew the screen content, so the library could use 'zero rotation'.
+   ![Tunnel](img/3.png)
+
+4. **DeanTheCoder QR code to GitHub site**
+
+I made the QR code transition into a cloud of points, each following an x,y cos,cos curve (kinda like Lissajous plotting) with different multipliers and offsets.  
    ![QR code](img/4.png)  
-5. **Retro fire effect** – Classic fire animation brings warmth to the display.  
+
+5. **Retro fire effect**
+
+Rather than random seeds on the base line of the frame buffer, I drove the base line with fast-changing sin values to mimic smooth noise — it makes the gradient look nicer. At the end I just stop the seed line so the fire naturally fades away.  
    ![Retro fire](img/5.png)  
-6. **Amiga Boing Ball** – Nostalgic bouncing ball animation inspired by the Amiga.  
-   Inspired by the original [Amiga Boing Ball](https://en.wikipedia.org/wiki/Amiga).
-   ![Boing Ball](img/6.png)  
-7. **Spinning donut** – A mesmerizing 3D donut spins smoothly on screen.  
-   Based on the [Donut Math article](https://www.a1k0n.net/2011/07/20/donut-math.html) from A1K0N.
-   ![Donut](img/7.png)  
-8. **Matrix rain** – Falling green code reminiscent of the Matrix movies.  
-   Glyphs based on the work from [Rezmason's Matrix project](https://github.com/Rezmason/matrix).
+
+6. **Amiga Boing Ball**
+
+The original Amiga ball used a palette trick to fake the rotation. Here I went with actual UV calculations and rotation.  
+   ![Boing Ball](img/6.png)
+
+7. **Spinning donut**
+
+This one was painfully slow at first because of all the trig calls. I fixed that by precalculating what I could and adding lookup tables for sin/cos.  
+   ![Donut](img/7.png)
+
+8. **Matrix rain**
+
+I borrowed the glyphs from Rezmason’s project and made the green code fall like in the movies, trying to capture that classic Matrix vibe.  
    ![Matrix rain](img/8.png)  
-9. **Conway's Game of Life** – Cellular automaton in action, evolving patterns on display.  
-   See [Conway's Game of Life](https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life) for more details about the algorithm.
+
+9. **Conway's Game of Life**
+
+I love watching patterns evolve, so I implemented this cellular automaton to see life emerge right on the tiny screen.  
    ![Game of Life](img/9.png)  
-10. **Kernel panic** – Occasionally throws a kernel panic to keep you guessing.  
+
+10. **Kernel panic**
+
+I throw in a kernel panic just to keep things interesting and remind you this is all just a bit of fun.  
    ![Kernel panic](img/10.png)  
 
 ---
