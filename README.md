@@ -3,7 +3,7 @@
 # 🧱 Brickintosh
 
 A tiny Lego Macintosh powered by an ESP32-S3 + 1.69" LCD display.  
-It looks like a Mac, boots as a ZX Spectrum, loads MacOS 8, and occasionally throws a kernel panic just to keep you guessing.  
+It looks like a Mac, boots as a ZX Spectrum, loads MacOS 9, and occasionally throws a kernel panic just to keep you guessing.  
 Because why settle for one retro system when you can mash them all together?
 
 ---
@@ -44,7 +44,7 @@ To run the ESP_SIM emulator on your desktop, ensure you have SDL2 installed. Com
 
 1. **Speccy loading sequence** – Boots up in true ZX Spectrum style before switching gears.  
    ![Speccy loading](img/1.png)  
-2. **Loading MacOS** – Watch MacOS 8 come to life on this tiny display.  
+2. **Loading MacOS** – Watch MacOS 9 come to life on this tiny display.  
    ![MacOS loading](img/2.png)  
 3. **Tunnel** – Simple pixel tunnel.  
    ![Tunnel](img/3.png)  
