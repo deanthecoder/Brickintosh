@@ -13,7 +13,7 @@ Brickintosh is just me having fun with retro mashups — hope it makes you smile
 ## 🛠 Hardware
 
 - [ESP32-S3 Dev Board with 1.69" IPS ST7789 LCD](https://thepihut.com/products/esp32-s3-development-board-with-1-69-lcd-display-240-x-280)  
-- Lego bricks (to taste) for the iconic case.  
+- Construction [bricks](https://www.amazon.co.uk/dp/B0D1SHXJQP) for the iconic case.
 
 ---
 
